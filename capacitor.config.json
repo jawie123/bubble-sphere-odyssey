@@ -1,0 +1,6 @@
+{
+  "appId": "com.bubblesphere.odyssey",
+  "appName": "Bubble Sphere Odyssey",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}
