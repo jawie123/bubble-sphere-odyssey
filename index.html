@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Bubble Sphere Odyssey</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    * { user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+    body { background: #070913; color: #f8fafc; font-family: system-ui, sans-serif; overflow: hidden; }
+    .glass-panel { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+    .glass-btn { background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9)); border: 1px solid rgba(255, 255, 255, 0.15); }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-center w-screen h-screen">
+  <div class="relative w-full max-w-md h-full max-h-[920px] flex flex-col justify-between items-center overflow-hidden bg-slate-950 border border-slate-800 rounded-none sm:rounded-3xl">
+    <header class="w-full px-4 pt-3 pb-2 glass-panel z-10 flex items-center justify-between">
+      <div class="flex flex-col items-start"><span class="text-[10px] text-cyan-400 font-semibold">Sector</span><span id="levelDisplay" class="text-lg font-black text-white">1</span></div>
+      <div class="flex flex-col items-center"><span class="text-[10px] text-pink-400 font-semibold">Score</span><span id="scoreDisplay" class="text-2xl font-black text-pink-400">0</span></div>
+      <div class="flex flex-col items-end"><span class="text-[10px] text-amber-400 font-semibold">Moves</span><span id="movesDisplay" class="text-lg font-black text-amber-300">25</span></div>
+    </header>
+    <main class="relative w-full flex-1 flex items-center justify-center overflow-hidden">
+      <canvas id="gameCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+    </main>
+  </div>
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    function resize() {
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+    function loop() {
+      ctx.fillStyle = '#070913';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      requestAnimationFrame(loop);
+    }
+    loop();
+  </script>
+</body>
+</html>
