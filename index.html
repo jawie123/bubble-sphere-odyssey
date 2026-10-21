@@ -4,45 +4,47 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Bubble Sphere Odyssey</title>
-    <!-- Tailwind CSS for UI Styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
             margin: 0;
             padding: 0;
-            background-color: #050515;
+            background-color: #030014;
             overflow: hidden;
-            font-family: system-ui, -apple-system, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             user-select: none;
             -webkit-user-select: none;
         }
-        .glass-panel {
-            background: rgba(15, 23, 42, 0.75);
-            backdrop-filter: blur(12px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        .neon-border {
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.3), inset 0 0 15px rgba(56, 189, 248, 0.2);
+        }
+        .glass-header {
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.6) 100%);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.12);
         }
     </style>
 </head>
 <body class="flex flex-col items-center justify-center w-screen h-screen">
-  <div class="relative w-full max-w-md h-full max-h-[920px] flex flex-col justify-between items-center overflow-hidden bg-slate-950 border border-slate-800 rounded-none sm:rounded-3xl shadow-2xl">
+  <div class="relative w-full max-w-md h-full max-h-[920px] flex flex-col justify-between items-center overflow-hidden bg-slate-950 border border-purple-900/40 neon-border rounded-none sm:rounded-3xl">
     
-    <!-- Top Bar UI -->
-    <header class="w-full px-5 pt-3 pb-2 glass-panel z-10 flex items-center justify-between">
+    <!-- Top HUD Header -->
+    <header class="w-full px-6 py-3 glass-header z-10 flex items-center justify-between">
       <div class="flex flex-col items-start">
-        <span class="text-[11px] text-cyan-400 font-bold uppercase tracking-wider">Sector</span>
-        <span id="levelDisplay" class="text-xl font-black text-white drop-shadow">1</span>
+        <span class="text-[10px] text-cyan-400 font-extrabold uppercase tracking-widest">Sector</span>
+        <span id="levelDisplay" class="text-xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">1</span>
       </div>
       <div class="flex flex-col items-center">
-        <span class="text-[11px] text-pink-400 font-bold uppercase tracking-wider">Score</span>
-        <span id="scoreDisplay" class="text-2xl font-black text-pink-400 drop-shadow">0</span>
+        <span class="text-[10px] text-pink-400 font-extrabold uppercase tracking-widest">Score</span>
+        <span id="scoreDisplay" class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-400 drop-shadow">0</span>
       </div>
       <div class="flex flex-col items-end">
-        <span class="text-[11px] text-amber-400 font-bold uppercase tracking-wider">Moves</span>
+        <span class="text-[10px] text-amber-400 font-extrabold uppercase tracking-widest">Moves</span>
         <span id="movesDisplay" class="text-xl font-black text-amber-300 drop-shadow">25</span>
       </div>
     </header>
 
-    <!-- Main Canvas Area -->
+    <!-- Canvas Graphic Stage -->
     <main class="relative w-full flex-1 flex items-center justify-center overflow-hidden">
       <canvas id="gameCanvas" class="w-full h-full block cursor-crosshair"></canvas>
     </main>
@@ -56,16 +58,25 @@
     let score = 0;
     let moves = 25;
 
-    const COLORS = ['#38bdf8', '#f43f5e', '#a855f7', '#facc15', '#22c55e'];
-    const RADIUS = 18;
+    // Pro Palette: Neon Space Spheres
+    const BUBBLE_COLORS = [
+      { main: '#38bdf8', glow: '#0284c7', core: '#e0f2fe' }, // Cyan
+      { main: '#f43f5e', glow: '#be123c', core: '#ffe4e6' }, // Neon Red/Pink
+      { main: '#c084fc', glow: '#7e22ce', core: '#f3e8ff' }, // Plasma Purple
+      { main: '#facc15', glow: '#ca8a04', core: '#fef9c3' }, // Cosmic Gold
+      { main: '#4ade80', glow: '#15803d', core: '#dcfce7' }  // Bio Green
+    ];
+
+    const RADIUS = 19;
     let grid = [];
-    const ROWS = 8;
+    const ROWS = 9;
     const COLS = 8;
 
     let currentBubble = null;
     let bullet = null;
     let aimAngle = -Math.PI / 2;
     let isAiming = false;
+    let particles = [];
 
     function resize() {
       canvas.width = canvas.parentElement.clientWidth;
@@ -80,12 +91,14 @@
       const startX = (canvas.width - (COLS * RADIUS * 2)) / 2 + RADIUS;
       for (let r = 0; r < ROWS; r++) {
         grid[r] = [];
-        for (let c = 0; c < COLS; c++) {
-          if (r < 4) {
+        const isOffset = r % 2 === 1;
+        const xOffset = isOffset ? RADIUS : 0;
+        for (let c = 0; c < (isOffset ? COLS - 1 : COLS); c++) {
+          if (r < 5) {
             grid[r][c] = {
-              x: startX + c * RADIUS * 2,
-              y: 50 + r * RADIUS * 2,
-              color: COLORS[Math.floor(Math.random() * COLORS.length)]
+              x: startX + xOffset + c * RADIUS * 2,
+              y: 55 + r * (RADIUS * 1.73),
+              color: BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)]
             };
           } else {
             grid[r][c] = null;
@@ -97,51 +110,65 @@
     function spawnCurrentBubble() {
       currentBubble = {
         x: canvas.width / 2,
-        y: canvas.height - 60,
-        color: COLORS[Math.floor(Math.random() * COLORS.length)]
+        y: canvas.height - 65,
+        color: BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)]
       };
     }
 
     function updateUI() {
       document.getElementById('levelDisplay').innerText = level;
-      document.getElementById('scoreDisplay').innerText = score;
+      document.getElementById('scoreDisplay').innerText = score.toLocaleString();
       document.getElementById('movesDisplay').innerText = moves;
     }
 
-    function drawBubble(x, y, color) {
+    // High Quality 3D Glossy Sphere Renderer
+    function drawGlossySphere(x, y, colorObj, scale = 1) {
+      const r = RADIUS * scale;
+      ctx.save();
       ctx.beginPath();
-      ctx.arc(x, y, RADIUS, 0, Math.PI * 2);
-      ctx.fillStyle = color;
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+
+      // Radial Outer Gradient
+      let grad = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
+      grad.addColorStop(0, colorObj.core);
+      grad.addColorStop(0.4, colorObj.main);
+      grad.addColorStop(1, colorObj.glow);
+
+      ctx.fillStyle = grad;
+      ctx.shadowColor = colorObj.main;
+      ctx.shadowBlur = 10;
       ctx.fill();
-      
-      // Inner Glow/Glint Effect
+
+      // Top Highlight Rim
       ctx.beginPath();
-      ctx.arc(x - RADIUS / 3, y - RADIUS / 3, RADIUS / 3, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.arc(x - r * 0.35, y - r * 0.35, r * 0.28, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
       ctx.fill();
-      ctx.closePath();
+
+      ctx.restore();
     }
 
-    function drawShooter() {
-      const shooterX = canvas.width / 2;
-      const shooterY = canvas.height - 60;
+    function drawAimLaser() {
+      if (!isAiming || bullet) return;
 
-      // Draw Aim Line
-      if (isAiming && !bullet) {
-        ctx.beginPath();
-        ctx.setLineDash([6, 6]);
-        ctx.moveTo(shooterX, shooterY);
-        ctx.lineTo(shooterX + Math.cos(aimAngle) * 250, shooterY + Math.sin(aimAngle) * 250);
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
-        ctx.lineWidth = 3;
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
+      const startX = canvas.width / 2;
+      const startY = canvas.height - 65;
 
-      // Draw Current Cannon Bubble
-      if (currentBubble) {
-        drawBubble(currentBubble.x, currentBubble.y, currentBubble.color);
-      }
+      ctx.save();
+      ctx.beginPath();
+      ctx.setLineDash([8, 8]);
+      ctx.moveTo(startX, startY);
+
+      let endX = startX + Math.cos(aimAngle) * 320;
+      let endY = startY + Math.sin(aimAngle) * 320;
+
+      ctx.lineTo(endX, endY);
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#38bdf8';
+      ctx.shadowBlur = 12;
+      ctx.stroke();
+      ctx.restore();
     }
 
     function shoot() {
@@ -149,13 +176,44 @@
       bullet = {
         x: currentBubble.x,
         y: currentBubble.y,
-        vx: Math.cos(aimAngle) * 12,
-        vy: Math.sin(aimAngle) * 12,
+        vx: Math.cos(aimAngle) * 15,
+        vy: Math.sin(aimAngle) * 15,
         color: currentBubble.color
       };
       moves--;
       updateUI();
       spawnCurrentBubble();
+    }
+
+    function createExplosion(x, y, colorObj) {
+      for (let i = 0; i < 12; i++) {
+        particles.push({
+          x: x,
+          y: y,
+          vx: (Math.random() - 0.5) * 8,
+          vy: (Math.random() - 0.5) * 8,
+          color: colorObj.main,
+          life: 1.0
+        });
+      }
+    }
+
+    function updateParticles() {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.04;
+
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+        } else {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 3 * p.life, 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.fill();
+        }
+      }
     }
 
     function updateBullet() {
@@ -164,24 +222,21 @@
       bullet.x += bullet.vx;
       bullet.y += bullet.vy;
 
-      // Bounce Off Side Walls
-      if (bullet.x - RADIUS <= 0 || bullet.x + RADIUS >= canvas.width) {
+      if (bullet.x - RADIUS <= 10 || bullet.x + RADIUS >= canvas.width - 10) {
         bullet.vx *= -1;
       }
 
-      // Hit Top
-      if (bullet.y - RADIUS <= 40) {
+      if (bullet.y - RADIUS <= 45) {
         snapToGrid();
         return;
       }
 
-      // Hit Grid Bubbles
       for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
+        for (let c = 0; c < grid[r].length; c++) {
           let b = grid[r][c];
           if (b) {
             let dist = Math.hypot(bullet.x - b.x, bullet.y - b.y);
-            if (dist < RADIUS * 2) {
+            if (dist < RADIUS * 1.8) {
               snapToGrid();
               return;
             }
@@ -191,12 +246,12 @@
     }
 
     function snapToGrid() {
-      score += 150;
+      createExplosion(bullet.x, bullet.y, bullet.color);
+      score += 250;
       updateUI();
       bullet = null;
     }
 
-    // Controls Handling (Touch & Mouse)
     function handlePointerMove(e) {
       const rect = canvas.getBoundingClientRect();
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -206,11 +261,11 @@
       const mouseY = clientY - rect.top;
 
       const shooterX = canvas.width / 2;
-      const shooterY = canvas.height - 60;
+      const shooterY = canvas.height - 65;
 
       aimAngle = Math.atan2(mouseY - shooterY, mouseX - shooterX);
-      if (aimAngle > -0.2) aimAngle = -0.2;
-      if (aimAngle < -Math.PI + 0.2) aimAngle = -Math.PI + 0.2;
+      if (aimAngle > -0.15) aimAngle = -0.15;
+      if (aimAngle < -Math.PI + 0.15) aimAngle = -Math.PI + 0.15;
       isAiming = true;
     }
 
@@ -221,26 +276,29 @@
     canvas.addEventListener('touchend', () => { isAiming = false; shoot(); });
 
     function loop() {
-      // Space Dark Background
-      ctx.fillStyle = '#050714';
+      ctx.fillStyle = '#030014';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Draw Grid Bubbles
+      drawAimLaser();
+
       for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
+        for (let c = 0; c < grid[r].length; c++) {
           if (grid[r] && grid[r][c]) {
-            drawBubble(grid[r][c].x, grid[r][c].y, grid[r][c].color);
+            drawGlossySphere(grid[r][c].x, grid[r][c].y, grid[r][c].color);
           }
         }
       }
 
-      // Draw Bullet
       if (bullet) {
-        drawBubble(bullet.x, bullet.y, bullet.color);
+        drawGlossySphere(bullet.x, bullet.y, bullet.color);
         updateBullet();
       }
 
-      drawShooter();
+      if (currentBubble) {
+        drawGlossySphere(currentBubble.x, currentBubble.y, currentBubble.color);
+      }
+
+      updateParticles();
       requestAnimationFrame(loop);
     }
 
