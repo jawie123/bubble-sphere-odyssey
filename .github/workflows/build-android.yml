@@ -34,19 +34,34 @@ jobs:
 
       - name: Add Android Platform
         run: |
-          npx cap add android
+          npx cap add android || true
           npx cap sync android
 
-      - name: Generate Release Key & Build Signed AAB
+      - name: Generate Keystore and Build Signed AAB & Debug APK
         run: |
           cd android
-          keytool -genkeypair -v -keystore release.keystore -alias releasekey -keyalg RSA -keysize 2048 -validity 10000 -storepass mysecretpass -keypass mysecretpass -dname "CN=BubbleSphere, OU=Dev, O=Dev, L=City, ST=State, C=US"
+
+          # 1. Generate Keystore File
+          keytool -genkeypair -v \
+            -keystore my-release-key.keystore \
+            -alias my-key-alias \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass "password123" \
+            -keypass "password123" \
+            -dname "CN=BubbleSphere, OU=Development, O=BubbleSphere, L=City, ST=State, C=US"
+
           chmod +x gradlew
+
+          # 2. Build Signed Release AAB
           ./gradlew bundleRelease \
-            -Pandroid.injected.signing.store.file=release.keystore \
-            -Pandroid.injected.signing.store.password=mysecretpass \
-            -Pandroid.injected.signing.key.alias=releasekey \
-            -Pandroid.injected.signing.key.password=mysecretpass
+            -Pandroid.injected.signing.store.file=$(pwd)/my-release-key.keystore \
+            -Pandroid.injected.signing.store.password=password123 \
+            -Pandroid.injected.signing.key.alias=my-key-alias \
+            -Pandroid.injected.signing.key.password=password123
+
+          # 3. Build Debug APK
           ./gradlew assembleDebug
 
       - name: Upload Debug APK
