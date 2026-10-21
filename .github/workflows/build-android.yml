@@ -37,6 +37,11 @@ jobs:
           npx cap add android || true
           npx cap sync android
 
+      - name: Update minSdkVersion to 24
+        run: |
+          sed -i 's/minSdkVersion = .*/minSdkVersion = 24/' android/variables.gradle || true
+          sed -i 's/minSdkVersion .*/minSdkVersion 24/' android/app/build.gradle || true
+
       - name: Generate Keystore and Build Signed AAB & Debug APK
         run: |
           cd android
