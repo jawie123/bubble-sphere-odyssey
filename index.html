@@ -4,50 +4,247 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Bubble Sphere Odyssey</title>
-    <!-- Local ya CDN Phaser with error handling -->
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <!-- Tailwind CSS for UI Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
             margin: 0;
             padding: 0;
             background-color: #050515;
             overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
+            font-family: system-ui, -apple-system, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
         }
-        #game-container {
-            width: 100%;
-            height: 100%;
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
     </style>
 </head>
 <body class="flex flex-col items-center justify-center w-screen h-screen">
-  <div class="relative w-full max-w-md h-full max-h-[920px] flex flex-col justify-between items-center overflow-hidden bg-slate-950 border border-slate-800 rounded-none sm:rounded-3xl">
-    <header class="w-full px-4 pt-3 pb-2 glass-panel z-10 flex items-center justify-between">
-      <div class="flex flex-col items-start"><span class="text-[10px] text-cyan-400 font-semibold">Sector</span><span id="levelDisplay" class="text-lg font-black text-white">1</span></div>
-      <div class="flex flex-col items-center"><span class="text-[10px] text-pink-400 font-semibold">Score</span><span id="scoreDisplay" class="text-2xl font-black text-pink-400">0</span></div>
-      <div class="flex flex-col items-end"><span class="text-[10px] text-amber-400 font-semibold">Moves</span><span id="movesDisplay" class="text-lg font-black text-amber-300">25</span></div>
+  <div class="relative w-full max-w-md h-full max-h-[920px] flex flex-col justify-between items-center overflow-hidden bg-slate-950 border border-slate-800 rounded-none sm:rounded-3xl shadow-2xl">
+    
+    <!-- Top Bar UI -->
+    <header class="w-full px-5 pt-3 pb-2 glass-panel z-10 flex items-center justify-between">
+      <div class="flex flex-col items-start">
+        <span class="text-[11px] text-cyan-400 font-bold uppercase tracking-wider">Sector</span>
+        <span id="levelDisplay" class="text-xl font-black text-white drop-shadow">1</span>
+      </div>
+      <div class="flex flex-col items-center">
+        <span class="text-[11px] text-pink-400 font-bold uppercase tracking-wider">Score</span>
+        <span id="scoreDisplay" class="text-2xl font-black text-pink-400 drop-shadow">0</span>
+      </div>
+      <div class="flex flex-col items-end">
+        <span class="text-[11px] text-amber-400 font-bold uppercase tracking-wider">Moves</span>
+        <span id="movesDisplay" class="text-xl font-black text-amber-300 drop-shadow">25</span>
+      </div>
     </header>
+
+    <!-- Main Canvas Area -->
     <main class="relative w-full flex-1 flex items-center justify-center overflow-hidden">
       <canvas id="gameCanvas" class="w-full h-full block cursor-crosshair"></canvas>
     </main>
   </div>
+
   <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
+
+    let level = 1;
+    let score = 0;
+    let moves = 25;
+
+    const COLORS = ['#38bdf8', '#f43f5e', '#a855f7', '#facc15', '#22c55e'];
+    const RADIUS = 18;
+    let grid = [];
+    const ROWS = 8;
+    const COLS = 8;
+
+    let currentBubble = null;
+    let bullet = null;
+    let aimAngle = -Math.PI / 2;
+    let isAiming = false;
+
     function resize() {
       canvas.width = canvas.parentElement.clientWidth;
       canvas.height = canvas.parentElement.clientHeight;
+      initGrid();
+      spawnCurrentBubble();
     }
     window.addEventListener('resize', resize);
-    resize();
+
+    function initGrid() {
+      grid = [];
+      const startX = (canvas.width - (COLS * RADIUS * 2)) / 2 + RADIUS;
+      for (let r = 0; r < ROWS; r++) {
+        grid[r] = [];
+        for (let c = 0; c < COLS; c++) {
+          if (r < 4) {
+            grid[r][c] = {
+              x: startX + c * RADIUS * 2,
+              y: 50 + r * RADIUS * 2,
+              color: COLORS[Math.floor(Math.random() * COLORS.length)]
+            };
+          } else {
+            grid[r][c] = null;
+          }
+        }
+      }
+    }
+
+    function spawnCurrentBubble() {
+      currentBubble = {
+        x: canvas.width / 2,
+        y: canvas.height - 60,
+        color: COLORS[Math.floor(Math.random() * COLORS.length)]
+      };
+    }
+
+    function updateUI() {
+      document.getElementById('levelDisplay').innerText = level;
+      document.getElementById('scoreDisplay').innerText = score;
+      document.getElementById('movesDisplay').innerText = moves;
+    }
+
+    function drawBubble(x, y, color) {
+      ctx.beginPath();
+      ctx.arc(x, y, RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      
+      // Inner Glow/Glint Effect
+      ctx.beginPath();
+      ctx.arc(x - RADIUS / 3, y - RADIUS / 3, RADIUS / 3, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.fill();
+      ctx.closePath();
+    }
+
+    function drawShooter() {
+      const shooterX = canvas.width / 2;
+      const shooterY = canvas.height - 60;
+
+      // Draw Aim Line
+      if (isAiming && !bullet) {
+        ctx.beginPath();
+        ctx.setLineDash([6, 6]);
+        ctx.moveTo(shooterX, shooterY);
+        ctx.lineTo(shooterX + Math.cos(aimAngle) * 250, shooterY + Math.sin(aimAngle) * 250);
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // Draw Current Cannon Bubble
+      if (currentBubble) {
+        drawBubble(currentBubble.x, currentBubble.y, currentBubble.color);
+      }
+    }
+
+    function shoot() {
+      if (bullet || moves <= 0) return;
+      bullet = {
+        x: currentBubble.x,
+        y: currentBubble.y,
+        vx: Math.cos(aimAngle) * 12,
+        vy: Math.sin(aimAngle) * 12,
+        color: currentBubble.color
+      };
+      moves--;
+      updateUI();
+      spawnCurrentBubble();
+    }
+
+    function updateBullet() {
+      if (!bullet) return;
+
+      bullet.x += bullet.vx;
+      bullet.y += bullet.vy;
+
+      // Bounce Off Side Walls
+      if (bullet.x - RADIUS <= 0 || bullet.x + RADIUS >= canvas.width) {
+        bullet.vx *= -1;
+      }
+
+      // Hit Top
+      if (bullet.y - RADIUS <= 40) {
+        snapToGrid();
+        return;
+      }
+
+      // Hit Grid Bubbles
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          let b = grid[r][c];
+          if (b) {
+            let dist = Math.hypot(bullet.x - b.x, bullet.y - b.y);
+            if (dist < RADIUS * 2) {
+              snapToGrid();
+              return;
+            }
+          }
+        }
+      }
+    }
+
+    function snapToGrid() {
+      score += 150;
+      updateUI();
+      bullet = null;
+    }
+
+    // Controls Handling (Touch & Mouse)
+    function handlePointerMove(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+      const mouseX = clientX - rect.left;
+      const mouseY = clientY - rect.top;
+
+      const shooterX = canvas.width / 2;
+      const shooterY = canvas.height - 60;
+
+      aimAngle = Math.atan2(mouseY - shooterY, mouseX - shooterX);
+      if (aimAngle > -0.2) aimAngle = -0.2;
+      if (aimAngle < -Math.PI + 0.2) aimAngle = -Math.PI + 0.2;
+      isAiming = true;
+    }
+
+    canvas.addEventListener('mousemove', handlePointerMove);
+    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); handlePointerMove(e); }, { passive: false });
+
+    canvas.addEventListener('mouseup', () => { isAiming = false; shoot(); });
+    canvas.addEventListener('touchend', () => { isAiming = false; shoot(); });
+
     function loop() {
-      ctx.fillStyle = '#070913';
+      // Space Dark Background
+      ctx.fillStyle = '#050714';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw Grid Bubbles
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (grid[r] && grid[r][c]) {
+            drawBubble(grid[r][c].x, grid[r][c].y, grid[r][c].color);
+          }
+        }
+      }
+
+      // Draw Bullet
+      if (bullet) {
+        drawBubble(bullet.x, bullet.y, bullet.color);
+        updateBullet();
+      }
+
+      drawShooter();
       requestAnimationFrame(loop);
     }
+
+    resize();
     loop();
   </script>
 </body>
