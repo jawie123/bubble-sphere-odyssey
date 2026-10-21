@@ -17,9 +17,9 @@
         body, html {
             width: 100%;
             height: 100%;
-            background-color: #050515;
+            background-color: #030014;
             overflow: hidden;
-            font-family: system-ui, -apple-system, sans-serif;
+            font-family: 'Segoe UI', Roboto, sans-serif;
         }
         #game-container {
             width: 100vw;
@@ -32,9 +32,15 @@
             background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
         }
         .hud-glass {
-            background: rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(12px);
-            border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(56, 189, 248, 0.25);
+        }
+        .modal-glass {
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(168, 85, 247, 0.4);
+            box-shadow: 0 0 35px rgba(168, 85, 247, 0.3);
         }
     </style>
 </head>
@@ -59,6 +65,40 @@
 
     <!-- Main Game Canvas -->
     <canvas id="gameCanvas" class="w-full h-full block z-10 cursor-crosshair"></canvas>
+
+    <!-- Game Over Modal -->
+    <div id="gameOverModal" class="hidden absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/75 px-4">
+        <div class="modal-glass w-full max-w-sm rounded-3xl p-6 text-center flex flex-col items-center gap-4">
+            <h2 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-pink-500 tracking-wider uppercase">GAME OVER</h2>
+            <p class="text-slate-300 text-sm">Moves khatam ho gaye hain!</p>
+            
+            <div class="w-full py-3 bg-slate-900/80 rounded-2xl border border-slate-800 flex flex-col items-center">
+                <span class="text-xs text-slate-400 uppercase font-bold">Final Score</span>
+                <span id="finalScoreText" class="text-3xl font-black text-amber-400">0</span>
+            </div>
+
+            <button onclick="restartGame()" class="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold text-lg rounded-2xl shadow-lg shadow-cyan-500/30 transition transform active:scale-95 uppercase tracking-wide">
+                Play Again
+            </button>
+        </div>
+    </div>
+
+    <!-- Level Complete Modal -->
+    <div id="levelClearModal" class="hidden absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/75 px-4">
+        <div class="modal-glass w-full max-w-sm rounded-3xl p-6 text-center flex flex-col items-center gap-4">
+            <h2 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 tracking-wider uppercase">SECTOR CLEARED!</h2>
+            <div class="text-4xl">🌟 🌟 🌟</div>
+            
+            <div class="w-full py-3 bg-slate-900/80 rounded-2xl border border-slate-800 flex flex-col items-center">
+                <span class="text-xs text-slate-400 uppercase font-bold">Current Score</span>
+                <span id="nextLevelScoreText" class="text-3xl font-black text-pink-400">0</span>
+            </div>
+
+            <button onclick="nextLevel()" class="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-lg rounded-2xl shadow-lg shadow-emerald-500/30 transition transform active:scale-95 uppercase tracking-wide">
+                Next Sector
+            </button>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -68,19 +108,19 @@
     let level = 1;
     let score = 0;
     let moves = 25;
+    let gameOver = false;
 
-    // High Gloss Bubble Themes
     const COLORS = [
-        { id: 0, c: '#38bdf8', g: '#0284c7', l: '#e0f2fe' }, // Cyan
-        { id: 1, c: '#f43f5e', g: '#be123c', l: '#ffe4e6' }, // Pink/Red
-        { id: 2, c: '#a855f7', g: '#7e22ce', l: '#f3e8ff' }, // Purple
-        { id: 3, c: '#facc15', g: '#ca8a04', l: '#fef9c3' }, // Yellow
-        { id: 4, c: '#22c55e', g: '#15803d', l: '#dcfce7' }  // Green
+        { id: 0, c: '#38bdf8', g: '#0284c7', l: '#e0f2fe' },
+        { id: 1, c: '#f43f5e', g: '#be123c', l: '#ffe4e6' },
+        { id: 2, c: '#a855f7', g: '#7e22ce', l: '#f3e8ff' },
+        { id: 3, c: '#facc15', g: '#ca8a04', l: '#fef9c3' },
+        { id: 4, c: '#22c55e', g: '#15803d', l: '#dcfce7' }
     ];
 
     let RADIUS = 22;
     let COLS = 8;
-    let ROWS = 12;
+    let ROWS = 11;
     let grid = [];
 
     let currentBubble = null;
@@ -89,7 +129,6 @@
     let aimAngle = -Math.PI / 2;
     let isAiming = false;
     let particles = [];
-    let floatingTexts = [];
 
     function resize() {
         canvas.width = window.innerWidth;
@@ -102,11 +141,12 @@
 
     function initGrid() {
         grid = [];
+        let initialRows = Math.min(4 + Math.floor(level / 2), 7);
         for (let r = 0; r < ROWS; r++) {
             grid[r] = [];
             let colsInRow = (r % 2 === 1) ? COLS - 1 : COLS;
             for (let c = 0; c < colsInRow; c++) {
-                if (r < 5) {
+                if (r < initialRows) {
                     grid[r][c] = { color: COLORS[Math.floor(Math.random() * COLORS.length)] };
                 } else {
                     grid[r][c] = null;
@@ -121,7 +161,7 @@
         let xOffset = isOffset ? RADIUS : 0;
         return {
             x: startX + xOffset + c * RADIUS * 2,
-            y: 90 + r * (RADIUS * 1.73)
+            y: 85 + r * (RADIUS * 1.73)
         };
     }
 
@@ -137,13 +177,11 @@
         let r = RADIUS * scale;
         ctx.save();
         
-        // Base Glow
         ctx.beginPath();
         ctx.arc(x, y, r + 2, 0, Math.PI * 2);
         ctx.fillStyle = colorObj.g + '66';
         ctx.fill();
 
-        // 3D Sphere Body
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         let grad = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
@@ -153,7 +191,6 @@
         ctx.fillStyle = grad;
         ctx.fill();
 
-        // Highlight Specular
         ctx.beginPath();
         ctx.arc(x - r * 0.35, y - r * 0.35, r * 0.25, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
@@ -164,24 +201,34 @@
 
     function drawLauncher() {
         let lx = canvas.width / 2;
-        let ly = canvas.height - 80;
+        let ly = canvas.height - 75;
 
-        // Launcher Base Ring
+        // Danger Threshold Line
+        let dangerY = 85 + (ROWS - 2) * (RADIUS * 1.73);
         ctx.save();
         ctx.beginPath();
-        ctx.arc(lx, ly, RADIUS * 1.8, 0, Math.PI * 2);
+        ctx.moveTo(0, dangerY);
+        ctx.lineTo(canvas.width, dangerY);
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.restore();
+
+        // Base Ring
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(lx, ly, RADIUS * 1.7, 0, Math.PI * 2);
         ctx.fillStyle = '#0f172a';
         ctx.strokeStyle = '#38bdf8';
         ctx.lineWidth = 3;
         ctx.stroke();
         ctx.fill();
 
-        // Next Bubble Preview (Left side)
         if (nextBubble) {
-            drawBubble(lx - 60, ly + 10, nextBubble.color, 0.65);
+            drawBubble(lx - 55, ly + 5, nextBubble.color, 0.65);
         }
 
-        // Current Shooter Bubble
         if (currentBubble && !bullet) {
             drawBubble(lx, ly, currentBubble.color);
         }
@@ -190,29 +237,29 @@
     }
 
     function drawAimLine() {
-        if (!isAiming || bullet) return;
+        if (!isAiming || bullet || gameOver) return;
         let lx = canvas.width / 2;
-        let ly = canvas.height - 80;
+        let ly = canvas.height - 75;
 
         ctx.save();
         ctx.beginPath();
         ctx.setLineDash([8, 8]);
         ctx.moveTo(lx, ly);
         
-        let targetX = lx + Math.cos(aimAngle) * 400;
-        let targetY = ly + Math.sin(aimAngle) * 400;
+        let targetX = lx + Math.cos(aimAngle) * 380;
+        let targetY = ly + Math.sin(aimAngle) * 380;
 
         ctx.lineTo(targetX, targetY);
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
         ctx.lineWidth = 3;
         ctx.stroke();
         ctx.restore();
     }
 
     function shoot() {
-        if (bullet || moves <= 0) return;
+        if (bullet || moves <= 0 || gameOver) return;
         let lx = canvas.width / 2;
-        let ly = canvas.height - 80;
+        let ly = canvas.height - 75;
 
         bullet = {
             x: lx,
@@ -232,18 +279,15 @@
         bullet.x += bullet.vx;
         bullet.y += bullet.vy;
 
-        // Bounce from side walls
         if (bullet.x - RADIUS <= 10 || bullet.x + RADIUS >= canvas.width - 10) {
             bullet.vx *= -1;
         }
 
-        // Top Wall hit
-        if (bullet.y - RADIUS <= 70) {
+        if (bullet.y - RADIUS <= 65) {
             snapBullet();
             return;
         }
 
-        // Grid Collision
         for (let r = 0; r < ROWS; r++) {
             let colsInRow = (r % 2 === 1) ? COLS - 1 : COLS;
             for (let c = 0; c < colsInRow; c++) {
@@ -283,6 +327,7 @@
         }
 
         bullet = null;
+        checkGameState();
     }
 
     function getMatches(startR, startC, colorId) {
@@ -338,23 +383,73 @@
     }
 
     function createBurstFX(x, y, colorObj) {
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < 14; i++) {
             particles.push({
                 x, y,
-                vx: (Math.random() - 0.5) * 8,
-                vy: (Math.random() - 0.5) * 8,
+                vx: (Math.random() - 0.5) * 9,
+                vy: (Math.random() - 0.5) * 9,
                 c: colorObj.c,
                 life: 1.0
             });
         }
     }
 
+    function checkGameState() {
+        let totalBubbles = 0;
+        let reachedBottom = false;
+
+        for (let r = 0; r < ROWS; r++) {
+            let colsInRow = (r % 2 === 1) ? COLS - 1 : COLS;
+            for (let c = 0; c < colsInRow; c++) {
+                if (grid[r][c]) {
+                    totalBubbles++;
+                    if (r >= ROWS - 2) reachedBottom = true;
+                }
+            }
+        }
+
+        if (totalBubbles === 0) {
+            document.getElementById('nextLevelScoreText').innerText = score;
+            document.getElementById('levelClearModal').classList.remove('hidden');
+            gameOver = true;
+        } else if (moves <= 0 || reachedBottom) {
+            document.getElementById('finalScoreText').innerText = score;
+            document.getElementById('gameOverModal').classList.remove('hidden');
+            gameOver = true;
+        }
+    }
+
+    function restartGame() {
+        score = 0;
+        moves = 25;
+        level = 1;
+        gameOver = false;
+        document.getElementById('scoreDisplay').innerText = score;
+        document.getElementById('movesDisplay').innerText = moves;
+        document.getElementById('levelDisplay').innerText = level;
+        document.getElementById('gameOverModal').classList.add('hidden');
+        initGrid();
+        spawnBubbles();
+    }
+
+    function nextLevel() {
+        level++;
+        moves = Math.max(25 - level, 15);
+        gameOver = false;
+        document.getElementById('levelDisplay').innerText = level;
+        document.getElementById('movesDisplay').innerText = moves;
+        document.getElementById('levelClearModal').classList.add('hidden');
+        initGrid();
+        spawnBubbles();
+    }
+
     function handlePointer(e) {
+        if (gameOver) return;
         let clientX = e.touches ? e.touches[0].clientX : e.clientX;
         let clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
         let lx = canvas.width / 2;
-        let ly = canvas.height - 80;
+        let ly = canvas.height - 75;
 
         aimAngle = Math.atan2(clientY - ly, clientX - lx);
         if (aimAngle > -0.15) aimAngle = -0.15;
@@ -372,7 +467,6 @@
 
         drawAimLine();
 
-        // Draw Grid
         for (let r = 0; r < ROWS; r++) {
             let colsInRow = (r % 2 === 1) ? COLS - 1 : COLS;
             for (let c = 0; c < colsInRow; c++) {
@@ -383,7 +477,6 @@
             }
         }
 
-        // Draw Active Bullet
         if (bullet) {
             drawBubble(bullet.x, bullet.y, bullet.color);
             updateBullet();
@@ -391,14 +484,13 @@
 
         drawLauncher();
 
-        // Particles
         for (let i = particles.length - 1; i >= 0; i--) {
             let p = particles[i];
             p.x += p.vx; p.y += p.vy; p.life -= 0.05;
             if (p.life <= 0) particles.splice(i, 1);
             else {
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, 3 * p.life, 0, Math.PI * 2);
+                ctx.arc(p.x, p.y, 3.5 * p.life, 0, Math.PI * 2);
                 ctx.fillStyle = p.c;
                 ctx.fill();
             }
