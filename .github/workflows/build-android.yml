@@ -37,16 +37,19 @@ jobs:
           npx cap add android || true
           npx cap sync android
 
-      - name: Update minSdkVersion to 24
+      - name: Update SDK Versions (minSdk 24, targetSdk 36, compileSdk 36)
         run: |
           sed -i 's/minSdkVersion = .*/minSdkVersion = 24/' android/variables.gradle || true
+          sed -i 's/targetSdkVersion = .*/targetSdkVersion = 36/' android/variables.gradle || true
+          sed -i 's/compileSdkVersion = .*/compileSdkVersion = 36/' android/variables.gradle || true
           sed -i 's/minSdkVersion .*/minSdkVersion 24/' android/app/build.gradle || true
+          sed -i 's/targetSdkVersion .*/targetSdkVersion 36/' android/app/build.gradle || true
+          sed -i 's/compileSdkVersion .*/compileSdkVersion 36/' android/app/build.gradle || true
 
       - name: Generate Keystore and Build Signed AAB & Debug APK
         run: |
           cd android
 
-          # 1. Generate Keystore File
           keytool -genkeypair -v \
             -keystore my-release-key.keystore \
             -alias my-key-alias \
@@ -59,14 +62,12 @@ jobs:
 
           chmod +x gradlew
 
-          # 2. Build Signed Release AAB
           ./gradlew bundleRelease \
             -Pandroid.injected.signing.store.file=$(pwd)/my-release-key.keystore \
             -Pandroid.injected.signing.store.password=password123 \
             -Pandroid.injected.signing.key.alias=my-key-alias \
             -Pandroid.injected.signing.key.password=password123
 
-          # 3. Build Debug APK
           ./gradlew assembleDebug
 
       - name: Upload Debug APK
