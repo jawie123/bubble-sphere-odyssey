@@ -4,306 +4,190 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Bubble Sphere Odyssey</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phaser 3 Library -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
-        body {
+        * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
+        }
+        body {
             background-color: #030014;
             overflow: hidden;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
             user-select: none;
-            -webkit-user-select: none;
         }
-        .neon-border {
-            box-shadow: 0 0 20px rgba(168, 85, 247, 0.3), inset 0 0 15px rgba(56, 189, 248, 0.2);
-        }
-        .glass-header {
-            background: linear-gradient(180deg, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.6) 100%);
-            backdrop-filter: blur(16px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        #game-container {
+            width: 100vw;
+            height: 100vh;
+            max-width: 480px;
+            max-height: 900px;
+            position: relative;
         }
     </style>
 </head>
-<body class="flex flex-col items-center justify-center w-screen h-screen">
-  <div class="relative w-full max-w-md h-full max-h-[920px] flex flex-col justify-between items-center overflow-hidden bg-slate-950 border border-purple-900/40 neon-border rounded-none sm:rounded-3xl">
-    
-    <!-- Top HUD Header -->
-    <header class="w-full px-6 py-3 glass-header z-10 flex items-center justify-between">
-      <div class="flex flex-col items-start">
-        <span class="text-[10px] text-cyan-400 font-extrabold uppercase tracking-widest">Sector</span>
-        <span id="levelDisplay" class="text-xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">1</span>
-      </div>
-      <div class="flex flex-col items-center">
-        <span class="text-[10px] text-pink-400 font-extrabold uppercase tracking-widest">Score</span>
-        <span id="scoreDisplay" class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-400 drop-shadow">0</span>
-      </div>
-      <div class="flex flex-col items-end">
-        <span class="text-[10px] text-amber-400 font-extrabold uppercase tracking-widest">Moves</span>
-        <span id="movesDisplay" class="text-xl font-black text-amber-300 drop-shadow">25</span>
-      </div>
-    </header>
+<body>
+    <div id="game-container"></div>
 
-    <!-- Canvas Graphic Stage -->
-    <main class="relative w-full flex-1 flex items-center justify-center overflow-hidden">
-      <canvas id="gameCanvas" class="w-full h-full block cursor-crosshair"></canvas>
-    </main>
-  </div>
-
-  <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-
-    let level = 1;
-    let score = 0;
-    let moves = 25;
-
-    // Pro Palette: Neon Space Spheres
-    const BUBBLE_COLORS = [
-      { main: '#38bdf8', glow: '#0284c7', core: '#e0f2fe' }, // Cyan
-      { main: '#f43f5e', glow: '#be123c', core: '#ffe4e6' }, // Neon Red/Pink
-      { main: '#c084fc', glow: '#7e22ce', core: '#f3e8ff' }, // Plasma Purple
-      { main: '#facc15', glow: '#ca8a04', core: '#fef9c3' }, // Cosmic Gold
-      { main: '#4ade80', glow: '#15803d', core: '#dcfce7' }  // Bio Green
-    ];
-
-    const RADIUS = 19;
-    let grid = [];
-    const ROWS = 9;
-    const COLS = 8;
-
-    let currentBubble = null;
-    let bullet = null;
-    let aimAngle = -Math.PI / 2;
-    let isAiming = false;
-    let particles = [];
-
-    function resize() {
-      canvas.width = canvas.parentElement.clientWidth;
-      canvas.height = canvas.parentElement.clientHeight;
-      initGrid();
-      spawnCurrentBubble();
-    }
-    window.addEventListener('resize', resize);
-
-    function initGrid() {
-      grid = [];
-      const startX = (canvas.width - (COLS * RADIUS * 2)) / 2 + RADIUS;
-      for (let r = 0; r < ROWS; r++) {
-        grid[r] = [];
-        const isOffset = r % 2 === 1;
-        const xOffset = isOffset ? RADIUS : 0;
-        for (let c = 0; c < (isOffset ? COLS - 1 : COLS); c++) {
-          if (r < 5) {
-            grid[r][c] = {
-              x: startX + xOffset + c * RADIUS * 2,
-              y: 55 + r * (RADIUS * 1.73),
-              color: BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)]
-            };
-          } else {
-            grid[r][c] = null;
-          }
-        }
-      }
-    }
-
-    function spawnCurrentBubble() {
-      currentBubble = {
-        x: canvas.width / 2,
-        y: canvas.height - 65,
-        color: BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)]
-      };
-    }
-
-    function updateUI() {
-      document.getElementById('levelDisplay').innerText = level;
-      document.getElementById('scoreDisplay').innerText = score.toLocaleString();
-      document.getElementById('movesDisplay').innerText = moves;
-    }
-
-    // High Quality 3D Glossy Sphere Renderer
-    function drawGlossySphere(x, y, colorObj, scale = 1) {
-      const r = RADIUS * scale;
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-
-      // Radial Outer Gradient
-      let grad = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
-      grad.addColorStop(0, colorObj.core);
-      grad.addColorStop(0.4, colorObj.main);
-      grad.addColorStop(1, colorObj.glow);
-
-      ctx.fillStyle = grad;
-      ctx.shadowColor = colorObj.main;
-      ctx.shadowBlur = 10;
-      ctx.fill();
-
-      // Top Highlight Rim
-      ctx.beginPath();
-      ctx.arc(x - r * 0.35, y - r * 0.35, r * 0.28, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-      ctx.fill();
-
-      ctx.restore();
-    }
-
-    function drawAimLaser() {
-      if (!isAiming || bullet) return;
-
-      const startX = canvas.width / 2;
-      const startY = canvas.height - 65;
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.setLineDash([8, 8]);
-      ctx.moveTo(startX, startY);
-
-      let endX = startX + Math.cos(aimAngle) * 320;
-      let endY = startY + Math.sin(aimAngle) * 320;
-
-      ctx.lineTo(endX, endY);
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
-      ctx.lineWidth = 3;
-      ctx.shadowColor = '#38bdf8';
-      ctx.shadowBlur = 12;
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    function shoot() {
-      if (bullet || moves <= 0) return;
-      bullet = {
-        x: currentBubble.x,
-        y: currentBubble.y,
-        vx: Math.cos(aimAngle) * 15,
-        vy: Math.sin(aimAngle) * 15,
-        color: currentBubble.color
-      };
-      moves--;
-      updateUI();
-      spawnCurrentBubble();
-    }
-
-    function createExplosion(x, y, colorObj) {
-      for (let i = 0; i < 12; i++) {
-        particles.push({
-          x: x,
-          y: y,
-          vx: (Math.random() - 0.5) * 8,
-          vy: (Math.random() - 0.5) * 8,
-          color: colorObj.main,
-          life: 1.0
-        });
-      }
-    }
-
-    function updateParticles() {
-      for (let i = particles.length - 1; i >= 0; i--) {
-        let p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life -= 0.04;
-
-        if (p.life <= 0) {
-          particles.splice(i, 1);
-        } else {
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, 3 * p.life, 0, Math.PI * 2);
-          ctx.fillStyle = p.color;
-          ctx.fill();
-        }
-      }
-    }
-
-    function updateBullet() {
-      if (!bullet) return;
-
-      bullet.x += bullet.vx;
-      bullet.y += bullet.vy;
-
-      if (bullet.x - RADIUS <= 10 || bullet.x + RADIUS >= canvas.width - 10) {
-        bullet.vx *= -1;
-      }
-
-      if (bullet.y - RADIUS <= 45) {
-        snapToGrid();
-        return;
-      }
-
-      for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < grid[r].length; c++) {
-          let b = grid[r][c];
-          if (b) {
-            let dist = Math.hypot(bullet.x - b.x, bullet.y - b.y);
-            if (dist < RADIUS * 1.8) {
-              snapToGrid();
-              return;
+    <script>
+        const config = {
+            type: Phaser.AUTO,
+            parent: 'game-container',
+            width: 430,
+            height: 860,
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH
+            },
+            physics: {
+                default: 'arcade',
+                arcade: { debug: false }
+            },
+            scene: {
+                preload: preload,
+                create: create,
+                update: update
             }
-          }
+        };
+
+        const game = new Phaser.Game(config);
+
+        let score = 0;
+        let moves = 25;
+        let sector = 1;
+        let scoreText, movesText, sectorText;
+        let shooterBubble, nextBubble;
+        let aimLine;
+        let bubblesGroup;
+        const colors = [0x38bdf8, 0xf43f5e, 0xa855f7, 0xfacc15, 0x22c55e];
+        let isShooting = false;
+        let activeBullet = null;
+
+        function preload() {
+            // High Resolution Generated Textures
+            this.load.image('space_bg', 'https://labs.phaser.io/assets/skies/space3.png');
         }
-      }
-    }
 
-    function snapToGrid() {
-      createExplosion(bullet.x, bullet.y, bullet.color);
-      score += 250;
-      updateUI();
-      bullet = null;
-    }
+        function create() {
+            // Background
+            let bg = this.add.image(215, 430, 'space_bg').setDisplaySize(430, 860);
+            bg.setAlpha(0.6);
 
-    function handlePointerMove(e) {
-      const rect = canvas.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            // Top Header Panel (Glassmorphic)
+            let header = this.add.graphics();
+            header.fillStyle(0x0f172a, 0.85);
+            header.fillRect(0, 0, 430, 80);
+            header.lineStyle(2, 0x38bdf8, 0.3);
+            header.strokeRect(0, 0, 430, 80);
 
-      const mouseX = clientX - rect.left;
-      const mouseY = clientY - rect.top;
+            // HUD Texts
+            this.add.text(25, 15, 'SECTOR', { fontSize: '11px', fill: '#38bdf8', fontStyle: 'bold' });
+            sectorText = this.add.text(25, 32, '1', { fontSize: '24px', fill: '#ffffff', fontStyle: 'bold' });
 
-      const shooterX = canvas.width / 2;
-      const shooterY = canvas.height - 65;
+            this.add.text(190, 15, 'SCORE', { fontSize: '11px', fill: '#f43f5e', fontStyle: 'bold' });
+            scoreText = this.add.text(190, 32, '0', { fontSize: '26px', fill: '#f43f5e', fontStyle: 'bold' });
 
-      aimAngle = Math.atan2(mouseY - shooterY, mouseX - shooterX);
-      if (aimAngle > -0.15) aimAngle = -0.15;
-      if (aimAngle < -Math.PI + 0.15) aimAngle = -Math.PI + 0.15;
-      isAiming = true;
-    }
+            this.add.text(340, 15, 'MOVES', { fontSize: '11px', fill: '#facc15', fontStyle: 'bold' });
+            movesText = this.add.text(340, 32, '25', { fontSize: '24px', fill: '#facc15', fontStyle: 'bold' });
 
-    canvas.addEventListener('mousemove', handlePointerMove);
-    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); handlePointerMove(e); }, { passive: false });
+            // Create Bubble Grid Group
+            bubblesGroup = this.add.group();
+            createGrid(this);
 
-    canvas.addEventListener('mouseup', () => { isAiming = false; shoot(); });
-    canvas.addEventListener('touchend', () => { isAiming = false; shoot(); });
+            // Aim Line Graphic
+            aimLine = this.add.graphics();
 
-    function loop() {
-      ctx.fillStyle = '#030014';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Shooter Cannon Base
+            createShooter(this);
 
-      drawAimLaser();
+            // Input Handling
+            this.input.on('pointermove', (pointer) => {
+                if (isShooting) return;
+                aimLine.clear();
+                aimLine.lineStyle(3, 0x38bdf8, 0.8);
+                
+                let angle = Phaser.Math.Angle.Between(215, 780, pointer.x, pointer.y);
+                if (angle < -0.2 && angle > -2.9) {
+                    let targetX = 215 + Math.cos(angle) * 300;
+                    let targetY = 780 + Math.sin(angle) * 300;
+                    aimLine.lineBetween(215, 780, targetX, targetY);
+                }
+            });
 
-      for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < grid[r].length; c++) {
-          if (grid[r] && grid[r][c]) {
-            drawGlossySphere(grid[r][c].x, grid[r][c].y, grid[r][c].color);
-          }
+            this.input.on('pointerup', (pointer) => {
+                if (isShooting || moves <= 0) return;
+                let angle = Phaser.Math.Angle.Between(215, 780, pointer.x, pointer.y);
+                if (angle < -0.2 && angle > -2.9) {
+                    shootBubble(this, angle);
+                }
+            });
         }
-      }
 
-      if (bullet) {
-        drawGlossySphere(bullet.x, bullet.y, bullet.color);
-        updateBullet();
-      }
+        function createGrid(scene) {
+            let radius = 22;
+            let startX = 45;
+            let startY = 130;
 
-      if (currentBubble) {
-        drawGlossySphere(currentBubble.x, currentBubble.y, currentBubble.color);
-      }
+            for (let r = 0; r < 5; r++) {
+                let offset = (r % 2 === 1) ? radius : 0;
+                let cols = (r % 2 === 1) ? 7 : 8;
+                for (let c = 0; c < cols; c++) {
+                    let x = startX + offset + (c * radius * 2);
+                    let y = startY + (r * radius * 1.75);
+                    let color = colors[Math.floor(Math.random() * colors.length)];
+                    
+                    let b = scene.add.circle(x, y, radius - 1, color);
+                    b.setStrokeStyle(2, 0xffffff, 0.5);
+                    bubblesGroup.add(b);
+                }
+            }
+        }
 
-      updateParticles();
-      requestAnimationFrame(loop);
-    }
+        function createShooter(scene) {
+            // Cannon Platform
+            let base = scene.add.circle(215, 780, 35, 0x1e293b);
+            base.setStrokeStyle(3, 0x38bdf8, 0.8);
 
-    resize();
-    loop();
-  </script>
+            // Shooter Bubble
+            let color = colors[Math.floor(Math.random() * colors.length)];
+            shooterBubble = scene.add.circle(215, 780, 21, color);
+            shooterBubble.setStrokeStyle(2, 0xffffff, 0.8);
+        }
+
+        function shootBubble(scene, angle) {
+            isShooting = true;
+            aimLine.clear();
+            moves--;
+            movesText.setText(moves);
+
+            activeBullet = scene.add.circle(215, 780, 21, shooterBubble.fillColor);
+            activeBullet.setStrokeStyle(2, 0xffffff, 0.8);
+
+            let speed = 900;
+            let vx = Math.cos(angle) * speed;
+            let vy = Math.sin(angle) * speed;
+
+            scene.tweens.add({
+                targets: activeBullet,
+                x: activeBullet.x + (vx * 0.5),
+                y: activeBullet.y + (vy * 0.5),
+                duration: 500,
+                onComplete: () => {
+                    score += 250;
+                    scoreText.setText(score);
+                    activeBullet.destroy();
+                    isShooting = false;
+                    createShooter(scene);
+                }
+            });
+        }
+
+        function update() {}
+    </script>
 </body>
 </html>
