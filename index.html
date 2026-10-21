@@ -37,10 +37,10 @@
             border-bottom: 1px solid rgba(56, 189, 248, 0.25);
         }
         .modal-glass {
-            background: rgba(15, 23, 42, 0.92);
+            background: rgba(15, 23, 42, 0.95);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(168, 85, 247, 0.4);
-            box-shadow: 0 0 35px rgba(168, 85, 247, 0.3);
+            border: 1px solid rgba(168, 85, 247, 0.5);
+            box-shadow: 0 0 40px rgba(168, 85, 247, 0.4);
         }
     </style>
 </head>
@@ -67,10 +67,10 @@
     <canvas id="gameCanvas" class="w-full h-full block z-10 cursor-crosshair"></canvas>
 
     <!-- Game Over Modal -->
-    <div id="gameOverModal" class="hidden absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/75 px-4">
+    <div id="gameOverModal" class="hidden absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/80 px-4">
         <div class="modal-glass w-full max-w-sm rounded-3xl p-6 text-center flex flex-col items-center gap-4">
             <h2 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-pink-500 tracking-wider uppercase">GAME OVER</h2>
-            <p class="text-slate-300 text-sm">Moves khatam ho gaye hain!</p>
+            <p id="gameOverReason" class="text-slate-300 text-sm">Moves khatam ho gaye hain!</p>
             
             <div class="w-full py-3 bg-slate-900/80 rounded-2xl border border-slate-800 flex flex-col items-center">
                 <span class="text-xs text-slate-400 uppercase font-bold">Final Score</span>
@@ -83,14 +83,14 @@
         </div>
     </div>
 
-    <!-- Level Complete Modal -->
-    <div id="levelClearModal" class="hidden absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/75 px-4">
+    <!-- Sector Victory Modal -->
+    <div id="levelClearModal" class="hidden absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/80 px-4">
         <div class="modal-glass w-full max-w-sm rounded-3xl p-6 text-center flex flex-col items-center gap-4">
             <h2 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 tracking-wider uppercase">SECTOR CLEARED!</h2>
             <div class="text-4xl">🌟 🌟 🌟</div>
             
             <div class="w-full py-3 bg-slate-900/80 rounded-2xl border border-slate-800 flex flex-col items-center">
-                <span class="text-xs text-slate-400 uppercase font-bold">Current Score</span>
+                <span class="text-xs text-slate-400 uppercase font-bold">Score</span>
                 <span id="nextLevelScoreText" class="text-3xl font-black text-pink-400">0</span>
             </div>
 
@@ -129,6 +129,7 @@
     let aimAngle = -Math.PI / 2;
     let isAiming = false;
     let particles = [];
+    let fallingBubbles = [];
 
     function resize() {
         canvas.width = window.innerWidth;
@@ -141,12 +142,12 @@
 
     function initGrid() {
         grid = [];
-        let initialRows = Math.min(4 + Math.floor(level / 2), 7);
+        let fillRows = Math.min(4 + Math.floor(level / 2), 6);
         for (let r = 0; r < ROWS; r++) {
             grid[r] = [];
             let colsInRow = (r % 2 === 1) ? COLS - 1 : COLS;
             for (let c = 0; c < colsInRow; c++) {
-                if (r < initialRows) {
+                if (r < fillRows) {
                     grid[r][c] = { color: COLORS[Math.floor(Math.random() * COLORS.length)] };
                 } else {
                     grid[r][c] = null;
@@ -203,19 +204,19 @@
         let lx = canvas.width / 2;
         let ly = canvas.height - 75;
 
-        // Danger Threshold Line
+        // Red Danger Threshold Line
         let dangerY = 85 + (ROWS - 2) * (RADIUS * 1.73);
         ctx.save();
         ctx.beginPath();
         ctx.moveTo(0, dangerY);
         ctx.lineTo(canvas.width, dangerY);
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.55)';
         ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
+        ctx.setLineDash([6, 6]);
         ctx.stroke();
         ctx.restore();
 
-        // Base Ring
+        // Pod Rim
         ctx.save();
         ctx.beginPath();
         ctx.arc(lx, ly, RADIUS * 1.7, 0, Math.PI * 2);
@@ -324,6 +325,7 @@
 
         if (matches.length >= 3) {
             popBubbles(matches);
+            dropOrphans();
         }
 
         bullet = null;
@@ -382,6 +384,42 @@
         });
     }
 
+    function dropOrphans() {
+        let connected = new Set();
+        let queue = [];
+
+        for (let c = 0; c < COLS; c++) {
+            if (grid[0][c]) {
+                connected.add(`0,${c}`);
+                queue.push({ r: 0, c: c });
+            }
+        }
+
+        while (queue.length > 0) {
+            let { r, c } = queue.shift();
+            getNeighbors(r, c).forEach(n => {
+                let key = `${n.r},${n.c}`;
+                if (!connected.has(key) && grid[n.r][n.c]) {
+                    connected.add(key);
+                    queue.push(n);
+                }
+            });
+        }
+
+        for (let r = 0; r < ROWS; r++) {
+            let colsInRow = (r % 2 === 1) ? COLS - 1 : COLS;
+            for (let c = 0; c < colsInRow; c++) {
+                if (grid[r][c] && !connected.has(`${r},${c}`)) {
+                    let p = getPos(r, c);
+                    fallingBubbles.push({ x: p.x, y: p.y, color: grid[r][c].color, vy: 2 });
+                    grid[r][c] = null;
+                    score += 100;
+                }
+            }
+        }
+        document.getElementById('scoreDisplay').innerText = score;
+    }
+
     function createBurstFX(x, y, colorObj) {
         for (let i = 0; i < 14; i++) {
             particles.push({
@@ -413,6 +451,7 @@
             document.getElementById('levelClearModal').classList.remove('hidden');
             gameOver = true;
         } else if (moves <= 0 || reachedBottom) {
+            document.getElementById('gameOverReason').innerText = reachedBottom ? "Bubbles crossed the danger line!" : "Out of moves!";
             document.getElementById('finalScoreText').innerText = score;
             document.getElementById('gameOverModal').classList.remove('hidden');
             gameOver = true;
@@ -494,6 +533,13 @@
                 ctx.fillStyle = p.c;
                 ctx.fill();
             }
+        }
+
+        for (let i = fallingBubbles.length - 1; i >= 0; i--) {
+            let fb = fallingBubbles[i];
+            fb.y += fb.vy; fb.vy += 0.5;
+            if (fb.y > canvas.height + 50) fallingBubbles.splice(i, 1);
+            else drawBubble(fb.x, fb.y, fb.color);
         }
 
         requestAnimationFrame(loop);
