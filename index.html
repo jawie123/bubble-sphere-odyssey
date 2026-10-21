@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Bubble Sphere Odyssey</title>
-    <!-- Tailwind CSS for Modern UI -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         * {
@@ -20,10 +19,9 @@
             font-family: 'Segoe UI', Roboto, sans-serif;
         }
         .glass-panel {
-            background: rgba(15, 23, 42, 0.75);
+            background: rgba(15, 23, 42, 0.85);
             backdrop-filter: blur(16px);
             border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
         }
         .neon-glow {
             box-shadow: 0 0 25px rgba(168, 85, 247, 0.4), inset 0 0 15px rgba(56, 189, 248, 0.3);
@@ -63,19 +61,18 @@
     let score = 0;
     let moves = 25;
 
-    // High Quality 3D Sphere Color Palette
     const SPHERES = [
-      { id: 'cyan', core: '#e0f2fe', mid: '#38bdf8', dark: '#0284c7', glow: 'rgba(56, 189, 248, 0.6)' },
-      { id: 'pink', core: '#ffe4e6', mid: '#f43f5e', dark: '#be123c', glow: 'rgba(244, 63, 94, 0.6)' },
-      { id: 'purple', core: '#f3e8ff', mid: '#c084fc', dark: '#7e22ce', glow: 'rgba(192, 132, 252, 0.6)' },
-      { id: 'gold', core: '#fef9c3', mid: '#facc15', dark: '#ca8a04', glow: 'rgba(250, 204, 21, 0.6)' },
-      { id: 'green', core: '#dcfce7', mid: '#4ade80', dark: '#15803d', glow: 'rgba(74, 222, 128, 0.6)' }
+      { id: 0, core: '#e0f2fe', mid: '#38bdf8', dark: '#0284c7', glow: 'rgba(56, 189, 248, 0.6)' }, // Cyan
+      { id: 1, core: '#ffe4e6', mid: '#f43f5e', dark: '#be123c', glow: 'rgba(244, 63, 94, 0.6)' }, // Pink
+      { id: 2, core: '#f3e8ff', mid: '#c084fc', dark: '#7e22ce', glow: 'rgba(192, 132, 252, 0.6)' }, // Purple
+      { id: 3, core: '#fef9c3', mid: '#facc15', dark: '#ca8a04', glow: 'rgba(250, 204, 21, 0.6)' }, // Gold
+      { id: 4, core: '#dcfce7', mid: '#4ade80', dark: '#15803d', glow: 'rgba(74, 222, 128, 0.6)' }  // Green
     ];
 
     const RADIUS = 20;
-    let grid = [];
-    const ROWS = 9;
+    const ROWS = 11;
     const COLS = 8;
+    let grid = [];
 
     let currentBubble = null;
     let bullet = null;
@@ -83,6 +80,7 @@
     let isAiming = false;
     let particles = [];
     let floatingScores = [];
+    let fallingBubbles = [];
 
     function resize() {
       canvas.width = canvas.parentElement.clientWidth;
@@ -94,18 +92,12 @@
 
     function initGrid() {
       grid = [];
-      const startX = (canvas.width - (COLS * RADIUS * 2)) / 2 + RADIUS;
       for (let r = 0; r < ROWS; r++) {
         grid[r] = [];
-        const isOffset = r % 2 === 1;
-        const xOffset = isOffset ? RADIUS : 0;
-        const colsCount = isOffset ? COLS - 1 : COLS;
-        
+        const colsCount = (r % 2 === 1) ? COLS - 1 : COLS;
         for (let c = 0; c < colsCount; c++) {
           if (r < 5) {
             grid[r][c] = {
-              x: startX + xOffset + c * RADIUS * 2,
-              y: 60 + r * (RADIUS * 1.73),
               sphere: SPHERES[Math.floor(Math.random() * SPHERES.length)]
             };
           } else {
@@ -113,6 +105,16 @@
           }
         }
       }
+    }
+
+    function getBubblePos(r, c) {
+      const startX = (canvas.width - (COLS * RADIUS * 2)) / 2 + RADIUS;
+      const isOffset = r % 2 === 1;
+      const xOffset = isOffset ? RADIUS : 0;
+      return {
+        x: startX + xOffset + c * RADIUS * 2,
+        y: 65 + r * (RADIUS * 1.73)
+      };
     }
 
     function spawnCurrentBubble() {
@@ -129,18 +131,15 @@
       document.getElementById('movesDisplay').innerText = moves;
     }
 
-    // High End 3D Sphere Renderer (Glossy 3D Shading)
     function render3DSphere(x, y, sphereObj, scale = 1) {
       const r = RADIUS * scale;
       ctx.save();
 
-      // Outer Glow Aura
       ctx.beginPath();
-      ctx.arc(x, y, r + 4, 0, Math.PI * 2);
+      ctx.arc(x, y, r + 3, 0, Math.PI * 2);
       ctx.fillStyle = sphereObj.glow;
       ctx.fill();
 
-      // 3D Spherical Gradient
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       let grad = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.05, x, y, r);
@@ -151,7 +150,6 @@
       ctx.fillStyle = grad;
       ctx.fill();
 
-      // Specular Reflection Highlight (Glass Reflection)
       ctx.beginPath();
       ctx.arc(x - r * 0.38, y - r * 0.38, r * 0.25, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
@@ -162,7 +160,6 @@
 
     function drawAimTrajectory() {
       if (!isAiming || bullet) return;
-
       const startX = canvas.width / 2;
       const startY = canvas.height - 70;
 
@@ -170,50 +167,34 @@
       ctx.beginPath();
       ctx.setLineDash([6, 8]);
       ctx.moveTo(startX, startY);
-
-      let endX = startX + Math.cos(aimAngle) * 350;
-      let endY = startY + Math.sin(aimAngle) * 350;
-
-      ctx.lineTo(endX, endY);
+      ctx.lineTo(startX + Math.cos(aimAngle) * 350, startY + Math.sin(aimAngle) * 350);
       ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
       ctx.lineWidth = 3.5;
       ctx.shadowColor = '#38bdf8';
-      ctx.shadowBlur = 15;
+      ctx.shadowBlur = 12;
       ctx.stroke();
       ctx.restore();
     }
 
     function triggerExplosion(x, y, sphereObj) {
-      for (let i = 0; i < 18; i++) {
+      for (let i = 0; i < 14; i++) {
         particles.push({
-          x: x,
-          y: y,
-          vx: (Math.random() - 0.5) * 12,
-          vy: (Math.random() - 0.5) * 12,
+          x: x, y: y,
+          vx: (Math.random() - 0.5) * 10,
+          vy: (Math.random() - 0.5) * 10,
           color: sphereObj.mid,
           size: Math.random() * 4 + 2,
           life: 1.0
         });
       }
-      floatingScores.push({
-        x: x,
-        y: y,
-        text: '+500 POP!',
-        life: 1.0
-      });
     }
 
     function updateParticlesAndFX() {
-      // Particles
       for (let i = particles.length - 1; i >= 0; i--) {
         let p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life -= 0.035;
-
-        if (p.life <= 0) {
-          particles.splice(i, 1);
-        } else {
+        p.x += p.vx; p.y += p.vy; p.life -= 0.04;
+        if (p.life <= 0) particles.splice(i, 1);
+        else {
           ctx.save();
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
@@ -225,23 +206,26 @@
         }
       }
 
-      // Floating Score Texts
       for (let i = floatingScores.length - 1; i >= 0; i--) {
         let fs = floatingScores[i];
-        fs.y -= 1.2;
-        fs.life -= 0.025;
-
-        if (fs.life <= 0) {
-          floatingScores.splice(i, 1);
-        } else {
+        fs.y -= 1.2; fs.life -= 0.025;
+        if (fs.life <= 0) floatingScores.splice(i, 1);
+        else {
           ctx.save();
-          ctx.font = '900 14px sans-serif';
+          ctx.font = '900 16px sans-serif';
           ctx.fillStyle = `rgba(250, 204, 21, ${fs.life})`;
           ctx.shadowColor = '#facc15';
           ctx.shadowBlur = 10;
-          ctx.fillText(fs.text, fs.x - 20, fs.y);
+          ctx.fillText(fs.text, fs.x - 30, fs.y);
           ctx.restore();
         }
+      }
+
+      for (let i = fallingBubbles.length - 1; i >= 0; i--) {
+        let fb = fallingBubbles[i];
+        fb.y += fb.vy; fb.vy += 0.5;
+        if (fb.y > canvas.height + 50) fallingBubbles.splice(i, 1);
+        else render3DSphere(fb.x, fb.y, fb.sphere);
       }
     }
 
@@ -261,28 +245,25 @@
 
     function updateBullet() {
       if (!bullet) return;
-
       bullet.x += bullet.vx;
       bullet.y += bullet.vy;
 
-      // Wall Bounce
       if (bullet.x - RADIUS <= 10 || bullet.x + RADIUS >= canvas.width - 10) {
         bullet.vx *= -1;
       }
 
-      // Top Hit
       if (bullet.y - RADIUS <= 50) {
         snapToGrid();
         return;
       }
 
-      // Grid Collision
       for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < grid[r].length; c++) {
-          let b = grid[r][c];
-          if (b) {
-            let dist = Math.hypot(bullet.x - b.x, bullet.y - b.y);
-            if (dist < RADIUS * 1.85) {
+        const colsCount = (r % 2 === 1) ? COLS - 1 : COLS;
+        for (let c = 0; c < colsCount; c++) {
+          if (grid[r] && grid[r][c]) {
+            let pos = getBubblePos(r, c);
+            let dist = Math.hypot(bullet.x - pos.x, bullet.y - pos.y);
+            if (dist < RADIUS * 1.75) {
               snapToGrid();
               return;
             }
@@ -292,10 +273,126 @@
     }
 
     function snapToGrid() {
-      triggerExplosion(bullet.x, bullet.y, bullet.sphere);
-      score += 500;
-      updateHUD();
+      let closestRow = 0, closestCol = 0;
+      let minDist = Infinity;
+
+      for (let r = 0; r < ROWS; r++) {
+        const colsCount = (r % 2 === 1) ? COLS - 1 : COLS;
+        for (let c = 0; c < colsCount; c++) {
+          if (!grid[r][c]) {
+            let pos = getBubblePos(r, c);
+            let dist = Math.hypot(bullet.x - pos.x, bullet.y - pos.y);
+            if (dist < minDist) {
+              minDist = dist;
+              closestRow = r;
+              closestCol = c;
+            }
+          }
+        }
+      }
+
+      grid[closestRow][closestCol] = { sphere: bullet.sphere };
+      let pos = getBubblePos(closestRow, closestCol);
+      
+      let matches = findMatches(closestRow, closestCol, bullet.sphere.id);
+      if (matches.length >= 3) {
+        popMatches(matches);
+        dropOrphans();
+      }
+
       bullet = null;
+    }
+
+    function getNeighbors(r, c) {
+      const isOffset = r % 2 === 1;
+      const dirs = isOffset ? [
+        [0, -1], [0, 1], [-1, 0], [-1, 1], [1, 0], [1, 1]
+      ] : [
+        [0, -1], [0, 1], [-1, -1], [-1, 0], [1, -1], [1, 0]
+      ];
+
+      let neighbors = [];
+      dirs.forEach(([dr, dc]) => {
+        let nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < ROWS) {
+          let colsCount = (nr % 2 === 1) ? COLS - 1 : COLS;
+          if (nc >= 0 && nc < colsCount) neighbors.push({ r: nr, c: nc });
+        }
+      });
+      return neighbors;
+    }
+
+    function findMatches(startR, startC, targetId) {
+      let matches = [];
+      let visited = new Set();
+      let queue = [{ r: startR, c: startC }];
+      visited.add(`${startR},${startC}`);
+
+      while (queue.length > 0) {
+        let { r, c } = queue.shift();
+        if (grid[r][c] && grid[r][c].sphere.id === targetId) {
+          matches.push({ r, c });
+          getNeighbors(r, c).forEach(n => {
+            let key = `${n.r},${n.c}`;
+            if (!visited.has(key) && grid[n.r][n.c]) {
+              visited.add(key);
+              queue.push(n);
+            }
+          });
+        }
+      }
+      return matches;
+    }
+
+    function popMatches(matches) {
+      let pts = matches.length * 200;
+      score += pts;
+      updateHUD();
+
+      matches.forEach(m => {
+        let pos = getBubblePos(m.r, m.c);
+        triggerExplosion(pos.x, pos.y, grid[m.r][m.c].sphere);
+        grid[m.r][m.c] = null;
+      });
+
+      let pos = getBubblePos(matches[0].r, matches[0].c);
+      floatingScores.push({ x: pos.x, y: pos.y, text: `+${pts} MATCH!`, life: 1.0 });
+    }
+
+    function dropOrphans() {
+      let connected = new Set();
+      let queue = [];
+
+      for (let c = 0; c < COLS; c++) {
+        if (grid[0][c]) {
+          connected.add(`0,${c}`);
+          queue.push({ r: 0, c: c });
+        }
+      }
+
+      while (queue.length > 0) {
+        let { r, c } = queue.shift();
+        getNeighbors(r, c).forEach(n => {
+          let key = `${n.r},${n.c}`;
+          if (!connected.has(key) && grid[n.r][n.c]) {
+            connected.add(key);
+            queue.push(n);
+          }
+        });
+      }
+
+      for (let r = 0; r < ROWS; r++) {
+        let colsCount = (r % 2 === 1) ? COLS - 1 : COLS;
+        for (let c = 0; c < colsCount; c++) {
+          if (grid[r][c] && !connected.has(`${r},${c}`)) {
+            let pos = getBubblePos(r, c);
+            fallingBubbles.push({ x: pos.x, y: pos.y, sphere: grid[r][c].sphere, vy: 2 });
+            grid[r][c] = null;
+            score += 100;
+          }
+        }
+      }
+      updateHUD();
     }
 
     function handlePointerMove(e) {
@@ -325,7 +422,6 @@
       ctx.fillStyle = '#030014';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Starfield dots
       ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
       for (let i = 0; i < 40; i++) {
         let x = (i * 97) % canvas.width;
@@ -338,22 +434,21 @@
       renderBackgroundGrid();
       drawAimTrajectory();
 
-      // Draw Grid Spheres
       for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < grid[r].length; c++) {
+        let colsCount = (r % 2 === 1) ? COLS - 1 : COLS;
+        for (let c = 0; c < colsCount; c++) {
           if (grid[r] && grid[r][c]) {
-            render3DSphere(grid[r][c].x, grid[r][c].y, grid[r][c].sphere);
+            let pos = getBubblePos(r, c);
+            render3DSphere(pos.x, pos.y, grid[r][c].sphere);
           }
         }
       }
 
-      // Draw Active Bullet
       if (bullet) {
         render3DSphere(bullet.x, bullet.y, bullet.sphere);
         updateBullet();
       }
 
-      // Draw Shooter Base & Current Sphere
       if (currentBubble) {
         render3DSphere(currentBubble.x, currentBubble.y, currentBubble.sphere);
       }
