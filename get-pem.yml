@@ -1,0 +1,22 @@
+name: Generate Real PEM Certificate
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-pem:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Certificate
+        run: |
+          keytool -genkeypair -v -keystore release-upload-key.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=BubbleSphere, OU=Dev, O=App, L=City, ST=State, C=US" -storepass "BubbleSphere2026!" -keypass "BubbleSphere2026!"
+          keytool -export -rfc -keystore release-upload-key.jks -alias upload -file upload_certificate.pem -storepass "BubbleSphere2026!"
+          base64 -w 0 release-upload-key.jks > keystore_base64.txt
+
+      - name: Upload PEM File
+        uses: actions/upload-artifact@v4
+        with:
+          name: play-console-pem-file
+          path: |
+            upload_certificate.pem
+            keystore_base64.txt
